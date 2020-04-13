@@ -1,120 +1,124 @@
+import pygame as pg
+import time
+
 class Node():
-    """A node class for A* Pathfinding"""
+	"""A node class for A* Pathfinding"""
+	def __init__(self, parent=None, position=None):
+		self.parent = parent
+		self.position = position
 
-    def __init__(self, parent=None, position=None):
-        self.parent = parent
-        self.position = position
+		self.g = 0
+		self.h = 0
+		self.f = 0
 
-        self.g = 0
-        self.h = 0
-        self.f = 0
+	def __eq__(self, other):
+		return self.position == other.position
 
-    def __eq__(self, other):
-        return self.position == other.position
+class astar():
+	def __init__(self):
+		self.screen = pg.display.set_mode((WIDTH, HEIGHT))
+		# Start, target and obstacles surface.
+		self.start = cl.Block(START_COLOR, START_INIT_POS)
+		self.target = cl.Block(TARGET_COLOR, TARGET_INIT_POS)
+		self.obs_surf = cl.SurfSprite()
 
+		# Tree's surface. (Normal pygame.surface.Surface).
+		self.tree_surf = pg.surface.Surface((WIDTH, HEIGHT))
+		self.tree_surf.set_colorkey(BG_COLOR)
+		self.tree_surf.fill(BG_COLOR)
 
-def astar(maze, start, end):
-    """Returns a list of tuples as a path from the given start to the given end in the given maze"""
+		# Will be a list for storing the vertices of the tree being constructed:
+		self.vertices = None
 
-    # Create start and end node
-    start_node = Node(None, start)
-    start_node.g = start_node.h = start_node.f = 0
-    end_node = Node(None, end)
-    end_node.g = end_node.h = end_node.f = 0
+		# Surface for testing collisions:
+		self.test_surf = cl.SurfSprite();
 
-    # Initialize both open and closed list
-    open_list = []
-    closed_list = []
-
-    # Add the start node
-    open_list.append(start_node)
-
-    # Loop until you find the end
-    while len(open_list) > 0:
-
-        # Get the current node
-        current_node = open_list[0]
-        current_index = 0
-        for index, item in enumerate(open_list):
-            if item.f < current_node.f:
-                current_node = item
-                current_index = index
-
-        # Pop current off open list, add to closed list
-        open_list.pop(current_index)
-        closed_list.append(current_node)
-
-        # Found the goal
-        if current_node == end_node:
-            path = []
-            current = current_node
-            while current is not None:
-                path.append(current.position)
-                current = current.parent
-            return path[::-1] # Return reversed path
-
-        # Generate children
-        children = []
-        for new_position in [(0, -1), (0, 1), (-1, 0), (1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1)]: # Adjacent squares
-
-            # Get node position
-            node_position = (current_node.position[0] + new_position[0], current_node.position[1] + new_position[1])
-
-            # Make sure within range
-            if node_position[0] > (len(maze) - 1) or node_position[0] < 0 or node_position[1] > (len(maze[len(maze)-1]) -1) or node_position[1] < 0:
-                continue
-
-            # Make sure walkable terrain
-            if maze[node_position[0]][node_position[1]] != 0:
-                continue
-
-            # Create new node
-            new_node = Node(current_node, node_position)
-
-            # Append
-            children.append(new_node)
-
-        # Loop through children
-        for child in children:
-
-            # Child is on the closed list
-            for closed_child in closed_list:
-                if child == closed_child:
-                    continue
-
-            # Create the f, g, and h values
-            child.g = current_node.g + 1
-            child.h = ((child.position[0] - end_node.position[0]) ** 2) + ((child.position[1] - end_node.position[1]) ** 2)
-            child.f = child.g + child.h
-
-            # Child is already in the open list
-            for open_node in open_list:
-                if child == open_node and child.g > open_node.g:
-                    continue
-
-            # Add the child to the open list
-            open_list.append(child)
+		# Contains the start, target and obstacles surface sprites.
+		self.sprites = pg.sprite.Group(self.start, self.target, self.obs_surf)
 
 
-def main():
+		# States: 'normal', 'start_drag', 'target_drag', 'drawing', 'erasing', 'running', 'path_found'.
+		self.state = 'normal'; print(self.state)
 
-    maze = [[0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
+		self.mainloop()
 
-    start = (0, 0)
-    end = (7, 6)
+	def run(map, start, end):
+		"""Returns a list of tuples as a path from the given start to the given end in the given map"""
+		# Create start and end node
+		start_node = Node(None, start)
+		start_node.g = start_node.h = start_node.f = 0
+		end_node = Node(None, end)
+		end_node.g = end_node.h = end_node.f = 0
 
-    path = astar(maze, start, end)
-    print(path)
+		# Initialize both open and closed list
+		open_list = []
+		closed_list = []
 
+		# Add the start node
+		open_list.append(start_node)
 
-if __name__ == '__main__':
-    main()
+		# Loop until you find the end
+		while len(open_list) > 0:
+
+			# Get the current node
+			current_node = open_list[0]
+			current_index = 0
+			for index, item in enumerate(open_list):
+				if item.f < current_node.f:
+					current_node = item
+					current_index = index
+
+			# Pop current off open list, add to closed list
+			open_list.pop(current_index)
+			closed_list.append(current_node)
+
+			# Found the goal
+			if current_node == end_node:
+				path = []
+				current = current_node
+				while current is not None:
+					path.append(current.position)
+					current = current.parent
+				return path[::-1] # Return reversed path
+
+			# Generate children
+			children = []
+			for new_position in [(0, -1), (0, 1), (-1, 0), (1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1)]: # Adjacent squares
+
+				# Get node position
+				node_position = (current_node.position[0] + new_position[0], current_node.position[1] + new_position[1])
+
+				# Make sure within range
+				if node_position[0] > (len(map) - 1) or node_position[0] < 0 or node_position[1] > (len(map[len(map)-1]) -1) or node_position[1] < 0:
+					continue
+
+				# Make sure walkable terrain
+				if map[node_position[0]][node_position[1]] != 0:
+					continue
+
+				# Create new node
+				new_node = Node(current_node, node_position)
+
+				# Append
+				children.append(new_node)
+
+			# Loop through children
+			for child in children:
+
+				# Child is on the closed list
+				for closed_child in closed_list:
+					if child == closed_child:
+						continue
+
+				# Create the f, g, and h values
+				child.g = current_node.g + 1
+				child.h = ((child.position[0] - end_node.position[0]) ** 2) + ((child.position[1] - end_node.position[1]) ** 2)
+				child.f = child.g + child.h
+
+				# Child is already in the open list
+				for open_node in open_list:
+					if child == open_node and child.g > open_node.g:
+						continue
+
+				# Add the child to the open list
+				open_list.append(child)
