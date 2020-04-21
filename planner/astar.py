@@ -1,8 +1,6 @@
-import pygame as pg
-import time
-
 class Node():
 	"""A node class for A* Pathfinding"""
+
 	def __init__(self, parent=None, position=None):
 		self.parent = parent
 		self.position = position
@@ -14,47 +12,24 @@ class Node():
 	def __eq__(self, other):
 		return self.position == other.position
 
-class astar():
+class astar:
 	def __init__(self):
-		self.screen = pg.display.set_mode((WIDTH, HEIGHT))
-		# Start, target and obstacles surface.
-		self.start = cl.Block(START_COLOR, START_INIT_POS)
-		self.target = cl.Block(TARGET_COLOR, TARGET_INIT_POS)
-		self.obs_surf = cl.SurfSprite()
-
-		# Tree's surface. (Normal pygame.surface.Surface).
-		self.tree_surf = pg.surface.Surface((WIDTH, HEIGHT))
-		self.tree_surf.set_colorkey(BG_COLOR)
-		self.tree_surf.fill(BG_COLOR)
-
-		# Will be a list for storing the vertices of the tree being constructed:
-		self.vertices = None
-
-		# Surface for testing collisions:
-		self.test_surf = cl.SurfSprite();
-
-		# Contains the start, target and obstacles surface sprites.
-		self.sprites = pg.sprite.Group(self.start, self.target, self.obs_surf)
-
-
-		# States: 'normal', 'start_drag', 'target_drag', 'drawing', 'erasing', 'running', 'path_found'.
-		self.state = 'normal'; print(self.state)
-
-		self.mainloop()
+		
 
 	def run(map, start, end):
 		"""Returns a list of tuples as a path from the given start to the given end in the given map"""
-		# Create start and end node
+
+		# Initializing start_node and end_node
 		start_node = Node(None, start)
 		start_node.g = start_node.h = start_node.f = 0
 		end_node = Node(None, end)
 		end_node.g = end_node.h = end_node.f = 0
 
-		# Initialize both open and closed list
+		# Initialize open and closed list
 		open_list = []
 		closed_list = []
 
-		# Add the start node
+		# Add the start node to open lise
 		open_list.append(start_node)
 
 		# Loop until you find the end
@@ -63,36 +38,41 @@ class astar():
 			# Get the current node
 			current_node = open_list[0]
 			current_index = 0
+			# find the node with lowest f in open list
 			for index, item in enumerate(open_list):
 				if item.f < current_node.f:
 					current_node = item
 					current_index = index
 
-			# Pop current off open list, add to closed list
+			# Move the current_node to closed list
 			open_list.pop(current_index)
 			closed_list.append(current_node)
 
 			# Found the goal
+			# End seaching until end_node is reached
 			if current_node == end_node:
 				path = []
 				current = current_node
+				# add nodes to path
 				while current is not None:
 					path.append(current.position)
 					current = current.parent
-				return path[::-1] # Return reversed path
+				# Return reversed path
+				return path[::-1]
 
-			# Generate children
+			# Generate children, searching for a path
 			children = []
-			for new_position in [(0, -1), (0, 1), (-1, 0), (1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1)]: # Adjacent squares
+			# Searchign neighbourhoods
+			for new_position in [(0, -1), (0, 1), (-1, 0), (1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1)]:
 
-				# Get node position
+				# Get neignbour node position
 				node_position = (current_node.position[0] + new_position[0], current_node.position[1] + new_position[1])
 
-				# Make sure within range
+				# Check the node is in the board
 				if node_position[0] > (len(map) - 1) or node_position[0] < 0 or node_position[1] > (len(map[len(map)-1]) -1) or node_position[1] < 0:
 					continue
 
-				# Make sure walkable terrain
+				# Check the node is not a obstacle
 				if map[node_position[0]][node_position[1]] != 0:
 					continue
 
@@ -102,23 +82,25 @@ class astar():
 				# Append
 				children.append(new_node)
 
-			# Loop through children
+			# Retreive children
 			for child in children:
 
-				# Child is on the closed list
-				for closed_child in closed_list:
-					if child == closed_child:
-						continue
+				# If child is in the closed list then ignore it
+				# for closed_child in closed_list:
+				#    if child == closed_child:
+				#       continue
+				if child in closed_list:
+					continue
 
-				# Create the f, g, and h values
-				child.g = current_node.g + 1
-				child.h = ((child.position[0] - end_node.position[0]) ** 2) + ((child.position[1] - end_node.position[1]) ** 2)
-				child.f = child.g + child.h
+				# Calculate the f, g, and h values
+				child.g = current_node.g + 1 # distance between parent to child
+				child.h = ((child.position[0] - end_node.position[0]) ** 2) + ((child.position[1] - end_node.position[1]) ** 2) # Pythagorean Theorem
+				child.f = child.g + child.h # f=g+h
 
-				# Child is already in the open list
+				# If child is not in the open list
+				# and the path is better
+				# then add the child to open list
 				for open_node in open_list:
-					if child == open_node and child.g > open_node.g:
+					if child == open_node and child.f > open_node.f:
 						continue
-
-				# Add the child to the open list
 				open_list.append(child)

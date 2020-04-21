@@ -1,322 +1,140 @@
+import random
+from math import hypot
+import numpy
 import pygame as pg
-import time
-from random import randrange as rand
-from math import inf, hypot
 
-from . import classes as cl
-from . constants import *
+WIDTH = 0
+HEIGHT = 0
+MAX_SEARCH = 10000
+THRESHOLD = 20
+RANGE = 10
+node_list = []
+EDGE_COLOR = (0,100,255) # lake blue
+PATH_COLOR = (255,100,0) # orange
+NODE_COLOR = (100,0,255) # purple
+BACKGROUND = (255,255,255) # white
+NODE_RADIUS = 3
 
 pg.init()
 
+class Node:
+	def __init__(self, pos, parent):
+		self.pos = pos
+		self.parent = parent
 
-# - - - - - - - - 
-# - Function to calculate distance between 2 points:
-def dist(p1, p2):
-  return hypot(p2[0]-p1[0], p2[1]-p1[1])
-# - - - - - - - - 
+def run(main_screen, map_surf, path_surf, start, end):
+	global node_list
+	running = True
+	i = 1
+	# initialize start and end node
+	start_node = Node((start[0],start[1]), None)
+	end_node = Node((end[0],end[1]), None)
+	# print("start: ",start_node.pos,". end: ",end_node.pos)
+	path_surf.image.fill(BACKGROUND)
+	WIDTH = map_surf.image.get_width()
+	HEIGHT = map_surf.image.get_height()
+	# print("WIDTH: ", WIDTH, ", HEIGHT: ", HEIGHT)
+	# add start point to node_list and start rrt
+	node_list.append(start_node)
 
-# ---------------------------------------------------------------------------------
-# - Main application class: -
-class Application:
-  def __init__(self):
+	while running:
+		# generate a random node on map
+		rand_node = (int(random.random()*WIDTH), int(random.random()*HEIGHT))
+		nearest_node = findNearestNode(rand_node)
+		next_node = getNextNode(rand_node, nearest_node)
+		# print("======")
+		# print("rand node", rand_node)
+		# print("nearest node", nearest_node.pos)
+		# print("next node", next_node.pos)
 
-    self.screen = pg.display.set_mode((WIDTH, HEIGHT))
+		# check collision
+		test_line = pg.draw.line(path_surf.image, EDGE_COLOR, next_node.pos, nearest_node.pos)
+		collision = pg.sprite.collide_mask(path_surf, map_surf)
+		# print(collision)
+		# abandon this attempt if test line collides with obstacle
+		if collision != None:
+			# remove the test line if it collides with obstacle
+			path_surf.image.fill(BACKGROUND, test_line)
+		else:
+			# add new node to list
+			node_list.append(next_node)
+			# draw new node
+			pg.draw.circle(path_surf.image, NODE_COLOR, next_node.pos, NODE_RADIUS)
+			line = pg.draw.line(main_screen, EDGE_COLOR, next_node.pos, nearest_node.pos)
+			circle = pg.draw.circle(main_screen, NODE_COLOR, next_node.pos, NODE_RADIUS)
+			pg.display.update([line,circle])
 
-    # Display's icon and caption:
-    icon = pg.surface.Surface((32,32))
-    icon.fill(START_COLOR)
-    pg.display.set_icon(icon)
-    pg.display.set_caption(CAPTION)
+		# stop searching if the end node is reachable
+		if getDistance(next_node.pos, end_node.pos) < RANGE:
+			# print("Path found!")
+			end_node.parent = next_node
+			node_list.append(end_node)
+			break
+		# increase i after each attempt
+		if i == MAX_SEARCH:
+			print("Max search number reached! Failed to find a path using RRT")
+			running = False
+		else:
+			i = i + 1
 
-    # Start, target and obstacles surface.
-    self.start = cl.Block(START_COLOR, START_INIT_POS)
-    self.target = cl.Block(TARGET_COLOR, TARGET_INIT_POS)
-    self.obs_surf = cl.SurfSprite()
+	path = findPath(main_screen, path_surf, node_list)
+	print(path)
 
-    # Tree's surface. (Normal pygame.surface.Surface).
-    self.tree_surf = pg.surface.Surface((WIDTH, HEIGHT))
-    self.tree_surf.set_colorkey(BG_COLOR)
-    self.tree_surf.fill(BG_COLOR)
+	running = True
+	while running:
+		for e in pg.event.get():
+			if e.type == pg.KEYDOWN and e.key == pg.K_ESCAPE:
+				running = False
+			elif e.type == pg.QUIT:
+				running = False
 
-    # Will be a list for storing the vertices of the tree being constructed:
-    self.vertices = None
+	node_list = []
+	return path
 
-    # Surface for testing collisions:
-    self.test_surf = cl.SurfSprite();
+def findNearestNode(rand_node):
+	# find the nearest node to the random node
+	nearest_node = node_list[0]
+	for node in node_list:
+		if getDistance(node.pos, rand_node) < getDistance(nearest_node.pos, rand_node):
+			nearest_node = node
+	return nearest_node
 
-    # Contains the start, target and obstacles surface sprites.
-    self.sprites = pg.sprite.Group(self.start, self.target, self.obs_surf)
+def getDistance(pos_1, pos_2):
+	return hypot(pos_2[0]-pos_1[0], pos_2[1]-pos_1[1])
 
+def getNextNode(rand_pos, nearest_node):
+	if getDistance(rand_pos, nearest_node.pos) < THRESHOLD:
+		next_node = Node(rand_pos, nearest_node)
+		return next_node
+	else:
+		try:
+			theta = numpy.arctan((rand_pos[0] - nearest_node.pos[0])/(rand_pos[1] - nearest_node.pos[1]))
+			next_x = int(round(nearest_node.pos[0] + THRESHOLD*numpy.sin(theta)))
+			next_y = int(round(nearest_node.pos[1] + THRESHOLD*numpy.cos(theta)))
+			# print("Next X: ",next_node.pos[0],"; Next Y: ",next_node.pos[1])
+			next_node = Node((next_x,next_y), nearest_node)
+			return next_node
+		except:
+			# if rand_node.pos[1] = nearest_node.pos[1]
+			next_x = nearest_node.pos[0] + THRESHOLD
+			next_y = nearest_node.pos[1]
+			next_node = Node((next_x,next_y), nearest_node)
+			return next_node
 
-    # States: 'normal', 'start_drag', 'target_drag', 'drawing', 'erasing', 'running', 'path_found'.
-    self.state = 'normal'; print(self.state)
-
-    self.mainloop()
-
-  # - - - - - - - - - - - - - - - - - - - - - -
-  def mainloop(self):
-    done = False
-    while not done:
-
-      # ---------------------------
-      # - Events handling:
-      for e in pg.event.get():
-        # If the user clicks the window's 'x', closes the app.
-        if e.type == pg.QUIT:
-           done = True 
-
-        elif e.type == pg.MOUSEBUTTONDOWN:
-          if e.button == 1:  # Left mouse button clicked:
-            if self.start.rect.collidepoint(e.pos):
-              self.state = 'start_drag'
-            elif self.target.rect.collidepoint(e.pos):
-              self.state = 'target_drag'
-            else:
-              self.state = 'drawing'
-          elif e.button == 3:  # Right button clicked:
-            self.state = 'erasing'
-          print(self.state)
-
-        elif e.type == pg.MOUSEBUTTONUP:
-          self.state = 'normal'; print(self.state)
-
-        elif e.type == pg.MOUSEMOTION:
-          if e.buttons[0]:  # Left mouse button holding:
-            if self.state == 'start_drag':
-              self.start.rect.center = e.pos
-            elif self.state == 'target_drag':
-              self.target.rect.center = e.pos
-            elif self.state == 'drawing':
-              pg.draw.line(self.obs_surf.image,OBS_COLOR, (e.pos[0]-e.rel[0], e.pos[1]-e.rel[1]), e.pos,OBS_WIDTH)
-          elif e.buttons[2]:  # Right mouse button holding:
-            if self.state == 'erasing':
-              pg.draw.line(self.obs_surf.image, 0, (e.pos[0]-e.rel[0], e.pos[1]-e.rel[1]), e.pos,OBS_WIDTH)
-
-        elif e.type == pg.KEYDOWN:
-          if e.key == pg.K_c:  # Clear obstacles on screen:
-            self.obs_surf.image.fill(BG_COLOR)
-            print('Obstacles surface cleared.')
-          elif e.key == pg.K_s:  # Save current obstacles surface:
-            self.save_obstacles()
-          elif e.key == pg.K_l:  # Load saved obstacles surface:
-            self.load_obstacles()
-          elif e.key == pg.K_RETURN:  # Enter pressed: run RRT algorithm.
-            self.state = 'running'; print(self.state)
-            if self.run() == 'quit':
-              done = True
-            self.state = 'normal'; print(self.state)
-      # ---------------------------
-      # Updates screen:
-      self.screen.fill(BG_COLOR)
-      self.sprites.draw(self.screen)
-      pg.display.flip()
-  # - - - - - - - - - - - - - - - - - - - - - -
-
-  # - - - - - - - - - - - - - - - - - - - - - -
-  # - Function that implements RRT algorithm:
-  def run(self):
-    # Clears tree surface.
-    self.tree_surf.fill(BG_COLOR)
-    # Additional mask variable to obs_surf, for mask collision tests.
-    self.obs_surf.mask = pg.mask.from_surface(self.obs_surf.image)
-
-    # The first added vertex (root) must be the start's position.
-    newvertex = cl.Vertex(self.start.rect.center, None)
-    self.vertices = [newvertex]
-    
-    # Info variables: tree's height, linear distance between start and target,
-    #  and the time of the agorithm.
-    treeheight = 0
-    lin_dist = dist(self.start.rect.center, self.target.rect.center)
-    start_time = time.perf_counter()
-
-    # Control variables:
-    showinfo = True
-    done = self.target.rect.collidepoint(self.start.rect.center)
-
-    # - - - - - - - - - - - - - - - - - - - - - - -
-    while not done:
-      # Sleeps the application for tests.
-      #time.sleep(0.1)
-
-      # - Events handling:
-      for e in pg.event.get():
-        if e.type == pg.QUIT:
-          return 'quit'
-        elif e.type == pg.KEYDOWN:
-          # 'h' key hides and shows
-          #   information on screen:
-          if e.key == pg.K_h:
-            showinfo = not showinfo
-            if showinfo == False:
-              # Hides information:
-              self.screen.fill(BG_COLOR)
-              self.sprites.draw(self.screen)
-              self.screen.blit(self.tree_surf, (0,0))
-              pg.display.flip()
-          else:
-            # If any key other than 'h' is pressed during
-            #  the algorithm execution, the algorithm ends.
-            return
-
-      # Show (or not) information on screen:
-      if showinfo:
-        self.show_info(time.perf_counter() - start_time, treeheight, len(self.vertices), lin_dist)
-
-      # - - -
-
-      # - RRT algorithm steps:
-
-      # Chooses a random point on the screen:
-      newpoint = (rand(WIDTH), rand(HEIGHT))
-
-      # Finds tree's vertex that is nearest to the point chosen:
-      nearest = self.find_nearest_vertex(newpoint)
-
-      # Tries to create and edge connecting 'nearest' to 'newpoint':
-        # Draws a line connecting the points on the test surface:
-      test_rect = pg.draw.line(self.test_surf.image, EDGE_COLOR, nearest.pos, newpoint)
-        # Checks for mask collision between the test surface and the obstacles surface:
-      collide = pg.sprite.collide_mask(self.test_surf, self.obs_surf)
-        # Clear the test surface:
-      self.test_surf.image.fill(BG_COLOR, test_rect)
-
-      # If there was no collision between the created edge and obstacles:
-      #  - creates a vertex on 'newpoint' and adds it to 'vertices';
-      #  - paints the newly created edge on the tree's surface;
-      #  - checks if newpoint is inside the 'target':
-      if not collide:
-        newvertex = cl.Vertex(newpoint, nearest)
-        self.vertices.append(newvertex)
-
-        # Tests if the new vertex increases the height of the tree:
-        if newvertex.depth > treeheight:
-          treeheight = newvertex.depth
-
-        # Drawings:
-        pg.draw.line(self.tree_surf, EDGE_COLOR, nearest.pos, newpoint)
-        pg.draw.circle(self.tree_surf, VERTEX_COLOR, newpoint, VERTEX_RADIUS)
-        lr = pg.draw.line(self.screen, EDGE_COLOR, nearest.pos, newpoint)
-        cr = pg.draw.circle(self.screen, VERTEX_COLOR, newpoint, VERTEX_RADIUS)
-        pg.display.update([lr,cr])
-
-        # If newpoint is inside target, then a path connecting start to target 
-        #  was found, and the algorithm ends.
-        if self.target.rect.collidepoint(newpoint):
-          done = True
-
-    # - - -
-
-    # - A path was found: paints the path, shows execution info, and waits for user to press a key:
-    last_time = time.perf_counter() - start_time
-    self.state = 'path_found'; print(self.state)
-    # Lenght (number of edges) and total distance (sum of all path's edges) of the path found:
-    path_len, path_dist = self.paint_path(newvertex)
-    showinfo = True
-    self.show_info(last_time, treeheight, len(self.vertices), lin_dist, path_dist, path_len)
-    loop = True
-    while loop:
-      for e in pg.event.get():
-        if e.type == pg.QUIT:
-          return 'quit'
-        elif e.type == pg.KEYDOWN:
-          # If a key other than 'h' is pressed, ends the function.
-          if e.key == pg.K_h:
-            showinfo = not showinfo
-            if showinfo == False:
-              self.screen.fill(BG_COLOR)
-              self.sprites.draw(self.screen)
-              self.screen.blit(self.tree_surf, (0,0))
-              pg.display.flip()
-            else:
-              self.show_info(last_time, treeheight, len(self.vertices), lin_dist, path_dist, path_len)                     
-          else:
-            loop = False
-  # - - - - - - - - - - - - - - - - - - - - - -
-
-  # - - - - - - - - - - - - - - - - - - - - - -
-  # Returns the vertex in the tree that is closest to the point given.
-  # Solves the Nearest Neighbor Search using linear search. 
-  def find_nearest_vertex(self, point):
-      nearest_dist = inf
-      for v in self.vertices:
-        currdist = dist(point, v.pos)
-        if currdist < nearest_dist:
-          nearest = v
-          nearest_dist = currdist
-      return nearest
-  # - - - - - - - - - - - - - - - - - - - - - -
-
-  # - - - - - - - - - - - - - - - - - - - - - -
-  # Saves the obstacle surface as 'map.png'.
-  def save_obstacles(self):
-    pg.image.save(self.obs_surf.image, 'map'+'.png')
-    print('Obstacles map saved.')
-  # - - - - - - - - - - - - - - - - - - - - - -
-
-  # - - - - - - - - - - - - - - - - - - - - - -
-  # Tries to load 'map.png' to 'self.obs_surf'.
-  def load_obstacles(self):
-    try:
-      self.obs_surf.image = pg.image.load('map.png').convert()
-    except:
-      print("'map.png' file was not found in the same directory.")
-      return
-    else:
-      print('Obstacles map loaded.')
-      self.obs_surf.image.set_colorkey(BG_COLOR)
-  # - - - - - - - - - - - - - - - - - - - - - -
-
-  # - - - - - - - - - - - - - - - - - - - - - -
-  # Show algorithm's execution info on screen:
-  def show_info(self, elapsed_time, height, nvertices, lin_dist, path_dist = None, path_len = None):
-    time_str = "  Elapsed time: %f s  " % elapsed_time
-    height_str = "  Tree's height: %d  " % height
-    vertices_str = "  Vertices: %d  " % nvertices
-    lin_dist_str = "  Linear distance: %f  " % lin_dist 
-
-    time_surf = FONT.render(time_str, 0, TEXT_COLOR, BG_COLOR)
-    height_surf = FONT.render(height_str, 0, TEXT_COLOR, BG_COLOR)
-    vertices_surf = FONT.render(vertices_str, 0, TEXT_COLOR, BG_COLOR)
-    lin_dist_surf = FONT.render(lin_dist_str, 0, TEXT_COLOR, BG_COLOR)
-
-    r1 = self.screen.blit(time_surf, (TEXT_X, TEXT_Y))
-    r2 = self.screen.blit(height_surf, (TEXT_X, TEXT_Y + TEXT_PADDING))
-    r3 = self.screen.blit(vertices_surf, (TEXT_X, TEXT_Y + 2*TEXT_PADDING))
-    r4 = self.screen.blit(lin_dist_surf, (TEXT_X, TEXT_Y + 3*TEXT_PADDING))
-
-    rectsUpdate = [r1, r2, r3, r4]
-
-    if self.state == 'path_found':
-      path_dist_str = "  Path distance: %f  " % path_dist 
-      path_dist_surf = FONT.render(path_dist_str, 0, TEXT_COLOR, (0,0,0))
-      r5 = self.screen.blit(path_dist_surf, (TEXT_X, TEXT_Y + 4*TEXT_PADDING))
-      path_len_str = "  Path length: %d  " % path_len 
-      path_len_surf = FONT.render(path_len_str, 0, TEXT_COLOR, (0,0,0))
-      r6 = self.screen.blit(path_len_surf, (TEXT_X, TEXT_Y + 5*TEXT_PADDING))
-      rectsUpdate += [r5, r6]
-
-    pg.display.update(rectsUpdate)
-  # - - - - - - - - - - - - - - - - - - - - - -
-
-  # - - - - - - - - - - - - - - - - - - - - - -
-  # Paints the path connecting 'start' to 'target', and returns its information (lenght and total path's distance):
-  def paint_path(self, lastvertex):
-    currvertex = lastvertex
-    path_len = 0
-    path_dist = 0.0
-
-    # - Draws path on the tree's surface image, then blits it on screen:
-    while currvertex.parent:
-      pg.draw.line(self.tree_surf, PATH_EDGE_COLOR, currvertex.pos, currvertex.parent.pos, PATH_EDGE_WIDTH)
-      pg.draw.circle(self.tree_surf, PATH_VERTEX_COLOR, currvertex.pos, PATH_VERTEX_RADIUS)
-      path_len += 1
-      path_dist += dist(currvertex.pos, currvertex.parent.pos)
-      currvertex = currvertex.parent
-    pg.draw.circle(self.tree_surf, PATH_VERTEX_COLOR, currvertex.pos, PATH_VERTEX_RADIUS)
-    self.screen.blit(self.tree_surf, (0,0))
-    pg.display.flip()
-
-    return path_len, path_dist
-  # - - - - - - - - - - - - - - - - - - - - - -
-# ---------------------------------------------------------------------------------
+def findPath(main_screen, path_surf, node_list):
+	path = []
+	next_node = node_list[-1]
+	# path.append((last_node.pos[0],last_node.pos[1]))
+	while next_node.parent is not None:
+		# append last node to path
+		path.append(next_node.pos)
+		# paint path
+		pg.draw.line(path_surf.image, PATH_COLOR, next_node.pos, next_node.parent.pos)
+		# move to next node
+		next_node = next_node.parent
+	# add last node (start node) to path
+	path.append(next_node.pos)
+	main_screen.blit(path_surf.image, (0,0))
+	pg.display.flip()
+	print("Path found by RRT!")
+	return path[::-1]
