@@ -23,6 +23,7 @@ class Node:
 		self.parent = parent
 
 def run(main_screen, map_surf, path_surf, start, end):
+	print("Finding path by RRT...")
 	global node_list
 	running = True
 	i = 1

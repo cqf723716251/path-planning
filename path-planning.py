@@ -5,7 +5,7 @@ import numpy as np
 import sys
 import pygame as pg
 
-from planner import rrt
+from planner import astar,rrt
 
 pg.init()
 
@@ -83,11 +83,13 @@ def main():
 				running = False 
 
 			elif e.type == pg.KEYDOWN:
-				if e.key == pg.K_RETURN:
-					START = start_point.rect.center
-					END = end_point.rect.center
-					# Run planner
-					print("Finding path...")
+				START = start_point.rect.center
+				END = end_point.rect.center
+				if e.key ==pg.K_1:
+					# run astar
+					astar_path = astar.run(main_screen, map_surf, path_surf, START, END)
+				elif e.key == pg.K_2:
+					# Run rrt planner
 					rrt_path = rrt.run(main_screen, map_surf, path_surf, START, END)
 
 			elif e.type == pg.MOUSEBUTTONDOWN:
