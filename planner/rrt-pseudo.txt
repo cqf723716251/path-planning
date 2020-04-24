@@ -1,0 +1,21 @@
+node_list = []
+THRESHOLD - 30
+MAX_ATTEMPT = 10000
+attempt = 0
+running = True
+
+append start_node to node_list
+
+while running:
+	randomly create a rand_node on map
+	nearest_node is the node in node_list that has least distance to rand_node
+	connect rand_node and nearest_node with edge
+	if edge does not intersect with obstacle:
+		append rand_node to node_list
+
+		if distance between end_node and rand_node < THRESHOLD:
+			append end_node to node_list
+			running = False
+
+		attempt + 1
+end

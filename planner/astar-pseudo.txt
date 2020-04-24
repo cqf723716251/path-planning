@@ -1,0 +1,20 @@
+open_list = []
+closed_list = []
+
+add start_node to open_list
+while open_list is not empty:
+	current_node is the node that has least f
+	move current_node from open_list to closed_list
+
+	if current_node is end_node:
+		end
+
+	for each neighbour of current_node:
+		if neighbour is not an obstacle:
+			if neighbour is not in open_list:
+				neighbour.g = current_node.g + distance between current_node and neighbour
+				neighbour.h = square of distance between neighbour and end_node
+				neighbour.f = neighbour.g + neighbour.h
+				set current_node as parent of neighbour
+				add neighbour to open_list
+end

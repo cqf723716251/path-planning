@@ -1,4 +1,6 @@
 import pygame as pg
+import time
+from math import hypot
 
 WIDTH = 0
 HEIGHT = 0
@@ -52,6 +54,12 @@ def run(main_screen, map_surf, path_surf, start, end):
 
 	# Loop until you find the end
 	while len(open_list) > 0:
+		# time.sleep(0.1)
+		# quit path searching when user press ESC
+		for e in pg.event.get():
+			if e.type == pg.KEYDOWN and e.key == pg.K_ESCAPE:
+				print("Path searching terminated!")
+				return None
 
 		# Get the current node
 		current_node = open_list[0]
@@ -111,7 +119,7 @@ def run(main_screen, map_surf, path_surf, start, end):
 			# Append
 			neighbours.append(new_node)
 
-			# draw new node
+			# draw neighbour
 			# print(new_node.pos)
 			pg.draw.line(path_surf.image, EDGE_COLOR, new_node.pos, current_node.pos)
 			pg.draw.circle(path_surf.image, NODE_COLOR, new_node.pos, NODE_RADIUS)
@@ -123,14 +131,11 @@ def run(main_screen, map_surf, path_surf, start, end):
 		for neighbour in neighbours:
 
 			# If neighbour is in the closed list then ignore it
-			# for closed_neighbour in closed_list:
-			#    if neighbour == closed_neighbour:
-			#       continue
 			if neighbour in closed_list:
 				continue
 
 			# Calculate the f, g, and h values
-			neighbour.g = current_node.g + 1 # distance between parent to neighbour
+			neighbour.g = current_node.g + getDistance(current_node.pos, neighbour.pos) # distance between parent to neighbour
 			neighbour.h = ((neighbour.pos[0] - end_node.pos[0]) ** 2) + ((neighbour.pos[1] - end_node.pos[1]) ** 2) # Pythagorean Theorem
 			neighbour.f = neighbour.g + neighbour.h # f=g+h
 
@@ -151,9 +156,26 @@ def findPath(main_screen, path_surf, current_node):
 		pg.draw.line(path_surf.image, PATH_COLOR, current_node.pos, current_node.parent.pos)
 		current_node = current_node.parent
 	# start node is the last node
-	path.append(current_node)
+	path.append(current_node.pos)
 	main_screen.blit(path_surf.image, (0,0))
 	pg.display.flip()
+	path = path[::-1]
+	# print("Path found by A*: ",path)
 	print("Path found by A*!")
+	lenth = getPathLength(path)
+	print("length: ",lenth)
+	print("==================================================================")
 	# Return reversed path
-	return path[::-1]
+	return path
+
+def getPathLength(path):
+	length = 0
+	index = 0
+	while index+1 < len(path):
+		length += getDistance(path[index],path[index+1])
+		index += 1
+	return length
+
+# get distance between two nodes
+def getDistance(pos_1, pos_2):
+	return hypot(pos_2[0]-pos_1[0], pos_2[1]-pos_1[1])
